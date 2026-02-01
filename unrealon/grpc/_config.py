@@ -36,7 +36,7 @@ class GRPCServiceConfig(BaseModel):
     # Heartbeat and logging
     heartbeat_interval: Annotated[float, Field(gt=0, le=300)] = 30.0
     log_batch_size: Annotated[int, Field(gt=0, le=1000)] = 10
-    log_flush_interval: Annotated[float, Field(gt=0, le=60)] = 1.0
+    log_flush_interval: Annotated[float, Field(gt=0, le=60)] = 3.0
 
     # Service metadata
     description: str = Field(default="", max_length=1000)

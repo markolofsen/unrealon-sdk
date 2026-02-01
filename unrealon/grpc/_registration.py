@@ -115,8 +115,30 @@ class RegistrationManager:
             return self._service_id, response.initial_config
 
         except aio.AioRpcError as e:
-            logger.error("gRPC registration error: %s - %s", e.code(), e.details())
-            raise
+            # Convert gRPC errors to human-readable messages
+            error_msg = self._format_grpc_error(e)
+            logger.error("Registration failed: %s", error_msg)
+            raise Exception(error_msg) from None
+
+    def _format_grpc_error(self, e: aio.AioRpcError) -> str:
+        """Convert gRPC error to human-readable message."""
+        code = str(e.code()).replace("StatusCode.", "")
+        details = e.details() or ""
+        server = self._config.grpc_server
+
+        # Common error translations
+        if "404" in details or code == "UNIMPLEMENTED":
+            return f"gRPC server at {server} returned 404. Check if gRPC service is running."
+        elif code == "UNAVAILABLE":
+            return f"Cannot connect to gRPC server at {server}. Check if server is running."
+        elif code == "UNAUTHENTICATED":
+            return f"Invalid API key for {server}. Check your credentials."
+        elif code == "DEADLINE_EXCEEDED":
+            return f"Connection to {server} timed out."
+        elif "127.0.0.1" in details or "localhost" in details:
+            return f"Connection refused to {server}. Is the gRPC server running?"
+        else:
+            return f"gRPC error ({code}): {details}"
 
     def register(
         self,

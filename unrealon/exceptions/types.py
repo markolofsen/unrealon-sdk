@@ -86,3 +86,34 @@ class RateLimitError(UnrealonError):
     """Rate limit exceeded."""
 
     pass
+
+
+class InterruptError(BaseException):
+    """Service interrupted by pause/stop command.
+
+    Inherits from BaseException (not Exception) so that generic
+    `except Exception` blocks don't catch it - only explicit
+    `except InterruptError` or `except BaseException` will catch it.
+
+    Raised by check_interrupt() when pause or stop is requested.
+    Parsers should catch this to cleanly exit processing loops.
+    """
+
+    def __init__(self, reason: str = "interrupted"):
+        super().__init__(f"Service {reason}")
+        self.reason = reason
+        self.message = f"Service {reason}"
+
+
+class PauseInterrupt(InterruptError):
+    """Service paused by command."""
+
+    def __init__(self):
+        super().__init__(reason="paused")
+
+
+class StopInterrupt(InterruptError):
+    """Service stopped by command."""
+
+    def __init__(self):
+        super().__init__(reason="stopped")

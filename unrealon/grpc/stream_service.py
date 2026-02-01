@@ -86,7 +86,7 @@ class GRPCStreamService:
         secure: bool = False,
         heartbeat_interval: float = 30.0,
         log_batch_size: int = 50,
-        log_flush_interval: float = 5.0,
+        log_flush_interval: float = 3.0,
         description: str = "",
         source_code: str = "",
         # Phase 1 parameters
@@ -412,9 +412,12 @@ class GRPCStreamService:
     async def _handle_server_message(self, message: unrealon_pb2.ServerMessage) -> None:
         """Handle incoming server messages."""
         payload_type = message.WhichOneof("payload")
+        logger.info("Received server message: type=%s, seq=%s", payload_type, message.sequence)
 
         if payload_type == "command":
-            await self._execute_command(message.command)
+            logger.info("Command received: type=%s, id=%s", message.command.type, message.command.id)
+            # Run command execution in background task so stream can continue receiving
+            asyncio.create_task(self._execute_command(message.command))
         elif payload_type == "heartbeat_ack":
             self._reconnection.reset_heartbeat_failures()
             logger.debug("Heartbeat ack: %s", message.heartbeat_ack.server_time)
@@ -614,14 +617,18 @@ class GRPCStreamService:
 
     def update_status(self, status: str, error_message: str | None = None) -> None:
         """Update service status."""
+        logger.info(f"update_status called: status={status}, has_loop={self._loop is not None}")
         self._status = status
 
         if self._loop:
             msg = self._messaging.create_status_update(status, error_message)
+            logger.info(f"Queueing status_update message: status={status}")
             asyncio.run_coroutine_threadsafe(
                 self._messaging.outgoing_queue.put(msg),
                 self._loop,
             )
+        else:
+            logger.warning("Cannot send status_update: no event loop")
 
     # ═══════════════════════════════════════════════════════════
     # LOG BATCHING

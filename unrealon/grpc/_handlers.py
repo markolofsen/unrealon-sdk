@@ -76,6 +76,7 @@ class CommandRegistry:
             Tuple of (status, result_json, error_message)
         """
         handler = self.get_handler(command.type)
+        logger.info("Executing command: type=%s, id=%s", command.type, command.id)
 
         if not handler:
             logger.warning("No handler for command type: %s", command.type)
@@ -83,15 +84,19 @@ class CommandRegistry:
 
         try:
             params: dict[str, Any] = json.loads(command.params) if command.params else {}
+            logger.info("Command params: %s", params)
 
             # Support both sync and async handlers
+            # IMPORTANT: Sync handlers run in thread pool to not block asyncio loop
             if asyncio.iscoroutinefunction(handler):
                 result = await handler(params)
             else:
-                result = handler(params)
+                # Run sync handler in thread pool so stream can still receive messages
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, handler, params)
 
             result_json = json.dumps(result) if result else None
-            logger.debug("Command %s completed", command.type)
+            logger.info("Command %s completed: result=%s", command.type, result)
             return unrealon_pb2.COMPLETED, result_json, None
 
         except Exception as e:

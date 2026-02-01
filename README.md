@@ -1,220 +1,209 @@
 # Unrealon SDK
 
-Python SDK for the Unrealon platform. Provides service registration, real-time logging, and metrics.
+Python SDK для мониторинга и управления сервисами через Unrealon платформу.
 
-## Installation
+## Что даёт SDK
+
+- **Мониторинг** — видишь статус сервиса в реальном времени
+- **Логи в облако** — все логи доступны в веб-интерфейсе
+- **Управление** — pause/resume/stop прямо из дашборда
+- **Метрики** — счётчики обработанных элементов и ошибок
+
+## Установка
 
 ```bash
 pip install unrealon
 ```
 
-## Quick Start
+## Быстрый старт
+
+### Минимальный пример
 
 ```python
 from unrealon import ServiceClient
 
-with ServiceClient(
-    api_key="your-api-key",
-    service_name="my-service",
-) as client:
+with ServiceClient(api_key="pk_xxx", service_name="my-service") as client:
+    client.info("Started")
 
     for item in items:
         process(item)
         client.increment_processed()
-        client.info(f"Processed item {item.id}")
+
+    client.info("Done")
 ```
 
-## Configuration
+Всё. Сервис зарегистрируется, логи пойдут в облако, метрики будут отображаться.
 
-### Environment Variables
+### С поддержкой pause/resume
+
+```python
+from unrealon import ServiceClient
+
+with ServiceClient(api_key="pk_xxx", service_name="my-parser") as client:
+    client.info("Started")
+
+    for item in items:
+        client.check_interrupt()  # Тут парсер встанет на паузу если нажать Pause
+
+        process(item)
+        client.increment_processed()
+
+    client.info("Done")
+```
+
+`check_interrupt()` делает две вещи:
+- Если нажали **Pause** — ждёт пока нажмут Resume
+- Если нажали **Stop** — выбрасывает `StopInterrupt`
+
+## Continuous Mode
+
+Сервис который ждёт команд из дашборда:
+
+```python
+import time
+from unrealon import ServiceClient
+from unrealon.exceptions import StopInterrupt
+
+with ServiceClient(api_key="pk_xxx", service_name="my-parser") as client:
+
+    def handle_run(params: dict) -> dict:
+        limit = params.get("limit", 100)
+
+        client.set_busy()
+        try:
+            for i in range(limit):
+                client.check_interrupt()
+                do_work()
+                client.increment_processed()
+            return {"status": "ok"}
+        except StopInterrupt:
+            return {"status": "stopped"}
+        finally:
+            client.set_idle()
+
+    client.on_command("run", handle_run)
+
+    # Ждём команд
+    client.set_idle()
+    while not client.should_stop:
+        time.sleep(1)
+```
+
+Теперь можно из дашборда:
+- Нажать **Run** — запустится `handle_run`
+- Нажать **Pause** — парсер встанет на `check_interrupt()`
+- Нажать **Resume** — продолжит с того же места
+- Нажать **Stop** — завершится gracefully
+
+## API
+
+### Логирование
+
+```python
+client.debug("Debug message")
+client.info("Info message", key="value")
+client.warning("Warning")
+client.error("Error", code=500)
+```
+
+Логи идут в три места: консоль (Rich), файл, облако.
+
+### Метрики
+
+```python
+client.increment_processed()      # +1 обработано
+client.increment_processed(10)    # +10 обработано
+client.increment_errors()         # +1 ошибка
+```
+
+### Статусы
+
+```python
+client.set_busy()    # Показывает "Busy" в дашборде
+client.set_idle()    # Показывает "Idle"
+```
+
+### Состояние
+
+```python
+client.is_paused     # True если на паузе
+client.should_stop   # True если запрошена остановка
+client.is_connected  # True если подключен к серверу
+```
+
+### Команды
+
+```python
+# Регистрация обработчика
+client.on_command("run", handle_run)
+client.on_command("custom", handle_custom)
+
+# Обработчик получает params и возвращает результат
+def handle_run(params: dict) -> dict:
+    limit = params.get("limit", 10)
+    # ... do work ...
+    return {"status": "ok", "processed": 100}
+```
+
+## Конфигурация
+
+### Через переменные окружения
 
 ```bash
-export UNREALON_API_KEY=your-api-key
+export UNREALON_API_KEY=pk_xxx
 export UNREALON_SERVICE_NAME=my-service
 ```
 
-### Direct Configuration
+```python
+# Подхватит из env
+with ServiceClient() as client:
+    ...
+```
+
+### Dev mode (локальный сервер)
 
 ```python
-client = ServiceClient(
-    api_key="your-api-key",
+with ServiceClient(
+    api_key="dk_xxx",
     service_name="my-service",
-)
+    dev_mode=True,  # Подключится к localhost:50051
+) as client:
+    ...
 ```
 
-## Features
-
-### Registration & Lifecycle
+## Exceptions
 
 ```python
-# Context manager (recommended)
-with ServiceClient(api_key="...", service_name="...") as client:
-    # Auto-registered on enter, auto-deregistered on exit
-    print(f"Service ID: {client.service_id}")
-
-# Manual control
-client = ServiceClient(api_key="...", service_name="...")
-client.start()
-# ... work ...
-client.stop()
-```
-
-### Logging
-
-The SDK provides a powerful logging system with three outputs:
-- **Rich console** - Beautiful colored output with tracebacks
-- **File** - Rotating log files in `logs/` directory
-- **gRPC cloud** - Real-time logs to Unrealon platform
-
-#### With ServiceClient
-
-```python
-with ServiceClient(...) as client:
-    # Logs go to: Rich console + file + cloud
-    client.info("Processing started", url="https://...", batch_size=100)
-    client.warning("Rate limited", retry_after=60)
-    client.error("Failed to parse", error_code=500)
-
-    # Access the logger directly for more control
-    client.logger.debug("Debug info", internal_state="ready")
-```
-
-#### Standalone Logger (without cloud)
-
-```python
-from unrealon.logging import get_logger
-
-# Logs go to: Rich console + file
-log = get_logger(__name__)
-log.info("Application started", version="1.0.0")
-log.error("Connection failed", host="db.example.com", port=5432)
-
-# Exception logging with full traceback
-try:
-    risky_operation()
-except Exception:
-    log.exception("Operation failed", context="startup")
-```
-
-#### Configuration
-
-```python
-from unrealon.logging import get_logger, LogConfig, setup_logging
-
-# Custom logger
-log = get_logger(
-    name="myapp",
-    level="DEBUG",
-    log_to_file=True,
-    log_to_console=True,
-    use_rich=True,
-)
-
-# Global setup
-setup_logging(LogConfig(
-    level="INFO",
-    log_to_file=True,
-    app_name="myapp",
-))
-```
-
-Log files are written to `logs/` in your project root (auto-detected via `pyproject.toml`, `.git`, etc.).
-
-### Metrics
-
-Track processing stats:
-
-```python
-with ServiceClient(...) as client:
-    for item in items:
-        try:
-            process(item)
-            client.increment_processed()
-        except Exception as e:
-            client.increment_errors()
-            client.error(f"Failed: {e}")
-```
-
-## Complete Example
-
-```python
-#!/usr/bin/env python3
-"""Example service using Unrealon SDK."""
-
-import random
-import time
-from unrealon import ServiceClient
-
-
-def run_service():
-    with ServiceClient(
-        api_key="your-api-key",
-        service_name="example-service",
-    ) as client:
-
-        print(f"Service registered: {client.service_id}")
-
-        for i in range(10):
-            # Simulate work
-            items = random.randint(1, 10)
-            client.increment_processed(items)
-            client.info(f"Processed {items} items")
-
-            if random.random() < 0.1:
-                client.increment_errors()
-                client.error("Random error occurred")
-
-            time.sleep(1)
-
-    print("Service stopped")
-
-
-if __name__ == "__main__":
-    run_service()
-```
-
-## Async Support
-
-```python
-import asyncio
-from unrealon import AsyncServiceClient
-
-
-async def main():
-    async with AsyncServiceClient(
-        api_key="your-api-key",
-        service_name="async-service",
-    ) as client:
-
-        for i in range(10):
-            client.info(f"Processing step {i}")
-            client.increment_processed()
-            await asyncio.sleep(1)
-
-
-asyncio.run(main())
-```
-
-## Error Handling
-
-```python
-from unrealon import (
-    UnrealonError,
-    AuthenticationError,
-    RegistrationError,
+from unrealon.exceptions import (
+    StopInterrupt,        # Stop requested (наследует BaseException!)
+    UnrealonError,        # Base SDK error
+    AuthenticationError,  # Bad API key
+    RegistrationError,    # Can't register
 )
 
 try:
     with ServiceClient(...) as client:
-        pass
-except AuthenticationError:
-    print("Invalid API key")
-except RegistrationError:
-    print("Registration failed")
-except UnrealonError:
-    print("SDK error")
+        for item in items:
+            client.check_interrupt()
+            process(item)
+except StopInterrupt:
+    print("Stopped by command")
 ```
 
-## License
+**Важно**: `StopInterrupt` наследует `BaseException`, не `Exception`.
+Это значит что `except Exception` его НЕ поймает — специально, чтобы
+generic error handlers не глотали команду stop.
 
-MIT
+## Standalone Logger
+
+Можно использовать логгер отдельно от SDK:
+
+```python
+from unrealon.logging import get_logger
+
+log = get_logger("myapp")
+log.info("Starting", version="1.0")
+log.error("Failed", error="connection timeout")
+```
+
+Логи пойдут в консоль и файл (без облака).

@@ -5,13 +5,14 @@ from __future__ import annotations
 import atexit
 import logging
 import signal
+import threading
 from types import FrameType
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ._config import UnrealonConfig, configure
-from .exceptions import RegistrationError
+from .exceptions import RegistrationError, StopInterrupt
 from .grpc.stream_service import GRPCStreamService
 from .logging import CloudHandler, UnrealonLogger, get_logger
 from .models import ServiceStatus
@@ -77,6 +78,7 @@ class ServiceClient:
         "_original_sigterm",
         "_logger",
         "_cloud_handler",
+        "_resume_event",
     )
 
     def __init__(
@@ -145,6 +147,8 @@ class ServiceClient:
         self._grpc: GRPCStreamService | None = None
         self._original_sigint: signal.Handlers | None = None
         self._original_sigterm: signal.Handlers | None = None
+        self._resume_event: threading.Event = threading.Event()
+        self._resume_event.set()  # Start as "not paused" (event is set)
 
         # Initialize logger with Rich console + file, cloud handler added on start
         self._logger: UnrealonLogger = get_logger(
@@ -259,10 +263,11 @@ class ServiceClient:
                 metadata=metadata.model_dump() if metadata else None,
             )
         except Exception as e:
+            # Use clean error message without traceback chain
             raise RegistrationError(
-                message=f"Failed to register service: {e}",
-                original_error=e,
-            ) from e
+                message=str(e),
+                suggestion="Check that gRPC server is running and accessible",
+            ) from None
 
         self.grpc.start_sync()
         self._is_started = True
@@ -464,25 +469,33 @@ class ServiceClient:
 
     def _handle_pause(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle pause command from server."""
+        self._logger.info("Command received: PAUSE", params=params)
+        # Don't reset _is_busy - we need to remember if we were processing
         self._is_paused = True
-        self._is_busy = False
+        self._resume_event.clear()  # Block check_interrupt() wait
         self.update_status("paused")
-        logger.info("Service paused via command")
+        self._logger.info("Service paused", is_paused=self._is_paused, is_busy=self._is_busy)
         return {"status": "paused"}
 
     def _handle_resume(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle resume command from server."""
+        self._logger.info("Command received: RESUME", params=params)
         self._is_paused = False
-        self.update_status("idle")
-        logger.info("Service resumed via command")
-        return {"status": "idle"}
+        self._resume_event.set()  # Unblock check_interrupt() wait
+        # Restore status based on whether we were processing before pause
+        new_status = "busy" if self._is_busy else "idle"
+        self.update_status(new_status)
+        self._logger.info("Service resumed", is_paused=self._is_paused, is_busy=self._is_busy)
+        return {"status": new_status}
 
     def _handle_stop(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle stop command from server."""
+        self._logger.info("Command received: STOP", params=params)
         self._shutdown_requested = True
         self._is_busy = False
+        self._resume_event.set()  # Unblock check_interrupt() wait (so it can raise StopInterrupt)
         self.update_status("stopping")
-        logger.info("Service stop requested via command")
+        self._logger.info("Service stopping", shutdown_requested=self._shutdown_requested)
         return {"status": "stopping"}
 
     def set_busy(self) -> None:
@@ -517,6 +530,41 @@ class ServiceClient:
         """Request graceful shutdown (sets flag for main loop to check)."""
         self._shutdown_requested = True
         logger.info("Shutdown requested")
+
+    def check_interrupt(self) -> None:
+        """Check for pause/stop and handle accordingly.
+
+        Call this frequently in long-running operations to allow
+        graceful interruption by commands from Unrealon dashboard.
+
+        Behavior:
+            - If stop requested: raises StopInterrupt
+            - If paused: waits (blocks) until resumed or stopped
+
+        Raises:
+            StopInterrupt: If stop was requested
+
+        Example:
+            for item in items:
+                m.client.check_interrupt()  # Will wait if paused, raise if stop
+                process(item)
+        """
+        if self._shutdown_requested:
+            # Use module-level logger to avoid Rich/cloud which may trigger time.sleep
+            logger.info("check_interrupt: raising StopInterrupt")
+            raise StopInterrupt()
+
+        if self._is_paused:
+            # Use module-level logger to avoid Rich/cloud which may trigger time.sleep
+            logger.info("Paused, waiting for resume...")
+            # Wait on event - unblocked by _handle_resume() or _handle_stop()
+            # Uses threading.Event which is not affected by time.sleep patches
+            self._resume_event.wait()
+            # After wait unblocks, check if it was due to stop
+            if self._shutdown_requested:
+                logger.info("Stop requested while paused, raising StopInterrupt")
+                raise StopInterrupt()
+            logger.info("Resumed, continuing...")
 
     def __enter__(self) -> ServiceClient:
         """Start client on context enter."""

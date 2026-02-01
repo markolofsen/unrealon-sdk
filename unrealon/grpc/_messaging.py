@@ -264,6 +264,8 @@ class MessageGenerator:
             # Check outgoing queue (command acks, status updates) - non-blocking
             try:
                 msg = self._outgoing_queue.get_nowait()
+                payload_type = msg.WhichOneof("payload")
+                logger.info(f"Sending message from queue: type={payload_type}, seq={msg.sequence}")
                 yield msg
             except asyncio.QueueEmpty:
                 pass

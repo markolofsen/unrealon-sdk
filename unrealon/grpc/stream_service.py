@@ -364,15 +364,18 @@ class GRPCStreamService:
 
     async def stop(self) -> None:
         """Stop streaming and close channel."""
-        self._running = False
         self._status = "stopping"
 
         # Stop monitoring
         self._reconnection.stop_silence_detector()
         self._connection.stop_state_watcher()
 
-        # Flush remaining logs
+        # Flush remaining logs and wait for queue to drain (while stream is still running)
         await self._flush_logs_now()
+        await self._wait_for_queue_drain(timeout=3.0)
+
+        # Now stop the stream
+        self._running = False
 
         # Close connection
         await self._connection.disconnect()
@@ -635,6 +638,18 @@ class GRPCStreamService:
                 )
             except asyncio.TimeoutError:
                 logger.warning("Timeout flushing logs on shutdown")
+
+    async def _wait_for_queue_drain(self, timeout: float = 3.0) -> None:
+        """Wait for outgoing queue to drain (logs to be sent)."""
+        start = asyncio.get_event_loop().time()
+        while not self._messaging.outgoing_queue.empty():
+            if asyncio.get_event_loop().time() - start > timeout:
+                logger.warning(
+                    "Timeout waiting for queue drain, %d messages remaining",
+                    self._messaging.outgoing_queue.qsize(),
+                )
+                break
+            await asyncio.sleep(0.1)
 
 
 __all__ = [

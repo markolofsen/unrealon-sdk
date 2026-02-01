@@ -41,6 +41,7 @@ from .enums import (
     ProcessJobStatus,
     ScheduleEventEventType,
     ScheduleRunStatus,
+    SendCommandRequestCommand,
     ServiceControlRequestAction,
     ServiceStatus,
 )
@@ -289,6 +290,7 @@ __all__ = [
     "ProcessJobStatus",
     "ScheduleEventEventType",
     "ScheduleRunStatus",
+    "SendCommandRequestCommand",
     "ServiceControlRequestAction",
     "ServiceStatus",
 ]

@@ -23,6 +23,20 @@ class ScheduleRunStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SCHEDULE_FAILED: _ClassVar[ScheduleRunStatus]
     SCHEDULE_SKIPPED: _ClassVar[ScheduleRunStatus]
     SCHEDULE_TIMEOUT: _ClassVar[ScheduleRunStatus]
+
+class ServiceStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SERVICE_STATUS_UNSPECIFIED: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_INITIALIZING: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_RUNNING: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_IDLE: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_BUSY: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_PAUSED: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_STOPPING: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_STOPPED: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_ERROR: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_OFFLINE: _ClassVar[ServiceStatus]
+    SERVICE_STATUS_STALE: _ClassVar[ServiceStatus]
 COMMAND_STATUS_UNSPECIFIED: CommandStatus
 ACKNOWLEDGED: CommandStatus
 EXECUTING: CommandStatus
@@ -34,6 +48,17 @@ SCHEDULE_COMPLETED: ScheduleRunStatus
 SCHEDULE_FAILED: ScheduleRunStatus
 SCHEDULE_SKIPPED: ScheduleRunStatus
 SCHEDULE_TIMEOUT: ScheduleRunStatus
+SERVICE_STATUS_UNSPECIFIED: ServiceStatus
+SERVICE_STATUS_INITIALIZING: ServiceStatus
+SERVICE_STATUS_RUNNING: ServiceStatus
+SERVICE_STATUS_IDLE: ServiceStatus
+SERVICE_STATUS_BUSY: ServiceStatus
+SERVICE_STATUS_PAUSED: ServiceStatus
+SERVICE_STATUS_STOPPING: ServiceStatus
+SERVICE_STATUS_STOPPED: ServiceStatus
+SERVICE_STATUS_ERROR: ServiceStatus
+SERVICE_STATUS_OFFLINE: ServiceStatus
+SERVICE_STATUS_STALE: ServiceStatus
 
 class ClientMessage(_message.Message):
     __slots__ = ("service_id", "sequence", "heartbeat", "logs", "command_ack", "status_update", "metrics_update", "schedule_ack")
@@ -232,6 +257,32 @@ class DeregisterResponse(_message.Message):
     success: bool
     message: str
     def __init__(self, success: bool = ..., message: _Optional[str] = ...) -> None: ...
+
+class SendCommandRequest(_message.Message):
+    __slots__ = ("service_id", "command_type", "params", "timeout_ms", "priority")
+    SERVICE_ID_FIELD_NUMBER: _ClassVar[int]
+    COMMAND_TYPE_FIELD_NUMBER: _ClassVar[int]
+    PARAMS_FIELD_NUMBER: _ClassVar[int]
+    TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    PRIORITY_FIELD_NUMBER: _ClassVar[int]
+    service_id: str
+    command_type: str
+    params: str
+    timeout_ms: int
+    priority: int
+    def __init__(self, service_id: _Optional[str] = ..., command_type: _Optional[str] = ..., params: _Optional[str] = ..., timeout_ms: _Optional[int] = ..., priority: _Optional[int] = ...) -> None: ...
+
+class SendCommandResponse(_message.Message):
+    __slots__ = ("success", "command_id", "message", "error")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    COMMAND_ID_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    command_id: str
+    message: str
+    error: str
+    def __init__(self, success: bool = ..., command_id: _Optional[str] = ..., message: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
 
 class ScheduleConfig(_message.Message):
     __slots__ = ("schedules", "config_version")

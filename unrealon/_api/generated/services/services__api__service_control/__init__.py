@@ -2,6 +2,8 @@
 
 from .client import ServicesServiceControlAPI
 from .models import (
+    SendCommandRequest,
+    SendCommandResponse,
     ServiceControlRequest,
 )
 from .sync_client import SyncServicesServiceControlAPI
@@ -9,5 +11,7 @@ from .sync_client import SyncServicesServiceControlAPI
 __all__ = [
     "ServicesServiceControlAPI",
     "SyncServicesServiceControlAPI",
+    "SendCommandRequest",
+    "SendCommandResponse",
     "ServiceControlRequest",
 ]

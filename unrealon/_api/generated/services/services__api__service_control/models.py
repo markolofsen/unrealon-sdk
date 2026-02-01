@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..enums import ServiceControlRequestAction
+from ..enums import SendCommandRequestCommand, ServiceControlRequestAction
 
 
 class ServiceControlRequest(BaseModel):
@@ -25,6 +25,46 @@ class ServiceControlRequest(BaseModel):
     action: ServiceControlRequestAction = Field(description='Control action to perform  * `st...')
     params: dict[str, Any] | None = None
     force: bool | None = None
+
+
+
+class SendCommandRequest(BaseModel):
+    """
+    Serializer for sending commands to connected services via gRPC. Used by the
+    send_command endpoint to send commands to services connected via gRPC
+    bidirectional stream.
+
+    Request model (no read-only fields).
+    """
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="allow",
+        frozen=False,
+    )
+
+    command: SendCommandRequestCommand = Field(description='Command to send: run (start task...')
+    params: dict[str, Any] | None = Field(None, description='Optional parameters passed to th...')
+
+
+
+class SendCommandResponse(BaseModel):
+    """
+    Response from send_command endpoint.
+
+    Response model (includes read-only fields).
+    """
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="allow",
+        frozen=False,
+    )
+
+    success: bool = Field(description='Whether command was sent success...')
+    command_id: str | None = Field(None, description='UUID of the created command (for...')
+    message: str | None = Field(None, description='Success message')
+    error: str | None = Field(None, description='Error message if failed')
 
 
 

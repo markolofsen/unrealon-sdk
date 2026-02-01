@@ -69,6 +69,8 @@ class ServiceClient:
         "_config",
         "_service_id",
         "_is_started",
+        "_is_paused",
+        "_is_busy",
         "_shutdown_requested",
         "_grpc",
         "_original_sigint",
@@ -137,6 +139,8 @@ class ServiceClient:
 
         self._service_id: str | None = None
         self._is_started: bool = False
+        self._is_paused: bool = False
+        self._is_busy: bool = False
         self._shutdown_requested: bool = False
         self._grpc: GRPCStreamService | None = None
         self._original_sigint: signal.Handlers | None = None
@@ -180,6 +184,16 @@ class ServiceClient:
     def shutdown_requested(self) -> bool:
         """Check if shutdown was requested."""
         return self._shutdown_requested
+
+    @property
+    def is_paused(self) -> bool:
+        """Check if service is paused."""
+        return self._is_paused
+
+    @property
+    def is_busy(self) -> bool:
+        """Check if service is busy (actively processing)."""
+        return self._is_busy
 
     @property
     def is_connected(self) -> bool:
@@ -254,6 +268,11 @@ class ServiceClient:
         self._is_started = True
         self._setup_signal_handlers()
         atexit.register(self._atexit_handler)
+
+        # Register built-in command handlers for pause/resume/stop
+        self.on_command("pause", self._handle_pause)
+        self.on_command("resume", self._handle_resume)
+        self.on_command("stop", self._handle_stop)
 
         # Connect cloud handler to gRPC service
         self._logger.addHandler(self._cloud_handler)
@@ -442,6 +461,57 @@ class ServiceClient:
             ```
         """
         self.grpc.on_any_schedule(handler)
+
+    def _handle_pause(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Handle pause command from server."""
+        self._is_paused = True
+        self._is_busy = False
+        self.update_status("paused")
+        logger.info("Service paused via command")
+        return {"status": "paused"}
+
+    def _handle_resume(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Handle resume command from server."""
+        self._is_paused = False
+        self.update_status("idle")
+        logger.info("Service resumed via command")
+        return {"status": "idle"}
+
+    def _handle_stop(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Handle stop command from server."""
+        self._shutdown_requested = True
+        self._is_busy = False
+        self.update_status("stopping")
+        logger.info("Service stop requested via command")
+        return {"status": "stopping"}
+
+    def set_busy(self) -> None:
+        """Mark service as busy (actively processing).
+
+        Call this at the start of processing work.
+        Status will be set to 'busy'.
+        """
+        if self._is_paused:
+            logger.warning("Cannot set busy while paused")
+            return
+        if self._shutdown_requested:
+            logger.warning("Cannot set busy while shutdown requested")
+            return
+        self._is_busy = True
+        self.update_status("busy")
+
+    def set_idle(self) -> None:
+        """Mark service as idle (waiting for commands).
+
+        Call this when processing is complete and waiting for next task.
+        Status will be set to 'idle'.
+        """
+        if self._is_paused:
+            return  # Stay paused
+        if self._shutdown_requested:
+            return  # Stay stopping
+        self._is_busy = False
+        self.update_status("idle")
 
     def request_shutdown(self) -> None:
         """Request graceful shutdown (sets flag for main loop to check)."""

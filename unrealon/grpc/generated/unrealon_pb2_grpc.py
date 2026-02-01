@@ -53,6 +53,11 @@ class UnrealonServiceStub(object):
                 request_serializer=unrealon__pb2.DeregisterRequest.SerializeToString,
                 response_deserializer=unrealon__pb2.DeregisterResponse.FromString,
                 _registered_method=True)
+        self.SendCommand = channel.unary_unary(
+                '/unrealon.v1.UnrealonService/SendCommand',
+                request_serializer=unrealon__pb2.SendCommandRequest.SerializeToString,
+                response_deserializer=unrealon__pb2.SendCommandResponse.FromString,
+                _registered_method=True)
 
 
 class UnrealonServiceServicer(object):
@@ -82,6 +87,13 @@ class UnrealonServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SendCommand(self, request, context):
+        """Send command to connected service (called by HTTP API)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_UnrealonServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -99,6 +111,11 @@ def add_UnrealonServiceServicer_to_server(servicer, server):
                     servicer.Deregister,
                     request_deserializer=unrealon__pb2.DeregisterRequest.FromString,
                     response_serializer=unrealon__pb2.DeregisterResponse.SerializeToString,
+            ),
+            'SendCommand': grpc.unary_unary_rpc_method_handler(
+                    servicer.SendCommand,
+                    request_deserializer=unrealon__pb2.SendCommandRequest.FromString,
+                    response_serializer=unrealon__pb2.SendCommandResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -186,6 +203,33 @@ class UnrealonService(object):
             '/unrealon.v1.UnrealonService/Deregister',
             unrealon__pb2.DeregisterRequest.SerializeToString,
             unrealon__pb2.DeregisterResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SendCommand(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/unrealon.v1.UnrealonService/SendCommand',
+            unrealon__pb2.SendCommandRequest.SerializeToString,
+            unrealon__pb2.SendCommandResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -180,13 +180,17 @@ class ServiceDetail(BaseModel):
 )
     connection_type: PatchedServiceDetailRequestConnectionType | None = Field(
     None,
-    description='How to control this service (loc...',
+    description='How to control this service (grp...',
 )
-    has_agent: bool | None = Field(None, description='Has CMDOP agent installed')
-    agent_url: str | None = Field(None, description='Agent HTTP URL for control', max_length=200)
+    has_agent: bool | None = Field(None, description='DEPRECATED: Has CMDOP agent inst...')
+    agent_url: str | None = Field(
+    None,
+    description='DEPRECATED: Agent HTTP URL for c...',
+    max_length=200,
+)
     cmdop_api_key: str | None = Field(
     None,
-    description='CMDOP API key for cloud connection',
+    description='DEPRECATED: CMDOP API key for cl...',
     max_length=200,
 )
     config: dict[str, Any] | None = Field(None, description='Service configuration')
@@ -234,13 +238,17 @@ class ServiceDetailRequest(BaseModel):
 )
     connection_type: PatchedServiceDetailRequestConnectionType | None = Field(
     None,
-    description='How to control this service (loc...',
+    description='How to control this service (grp...',
 )
-    has_agent: bool | None = Field(None, description='Has CMDOP agent installed')
-    agent_url: str | None = Field(None, description='Agent HTTP URL for control', max_length=200)
+    has_agent: bool | None = Field(None, description='DEPRECATED: Has CMDOP agent inst...')
+    agent_url: str | None = Field(
+    None,
+    description='DEPRECATED: Agent HTTP URL for c...',
+    max_length=200,
+)
     cmdop_api_key: str | None = Field(
     None,
-    description='CMDOP API key for cloud connection',
+    description='DEPRECATED: CMDOP API key for cl...',
     max_length=200,
 )
     config: dict[str, Any] | None = Field(None, description='Service configuration')
@@ -283,13 +291,17 @@ class PatchedServiceDetailRequest(BaseModel):
 )
     connection_type: PatchedServiceDetailRequestConnectionType | None = Field(
     None,
-    description='How to control this service (loc...',
+    description='How to control this service (grp...',
 )
-    has_agent: bool | None = Field(None, description='Has CMDOP agent installed')
-    agent_url: str | None = Field(None, description='Agent HTTP URL for control', max_length=200)
+    has_agent: bool | None = Field(None, description='DEPRECATED: Has CMDOP agent inst...')
+    agent_url: str | None = Field(
+    None,
+    description='DEPRECATED: Agent HTTP URL for c...',
+    max_length=200,
+)
     cmdop_api_key: str | None = Field(
     None,
-    description='CMDOP API key for cloud connection',
+    description='DEPRECATED: CMDOP API key for cl...',
     max_length=200,
 )
     config: dict[str, Any] | None = Field(None, description='Service configuration')

@@ -28,6 +28,7 @@ class CommandCommandType(StrEnum):
     * `restart` - Restart
     * `pause` - Pause
     * `resume` - Resume
+    * `run` - Run (Trigger parser)
     * `update_config` - Update Config
     * `custom` - Custom
     """
@@ -37,6 +38,7 @@ class CommandCommandType(StrEnum):
     RESTART = "restart"
     PAUSE = "pause"
     RESUME = "resume"
+    RUN = "run"
     UPDATE_CONFIG = "update_config"
     CUSTOM = "custom"
 
@@ -101,15 +103,15 @@ class PatchedServiceDetailRequestConnectionType(StrEnum):
     """
     How to control this service (local, cloud, ssh, or none)
     * `none` - No control (monitoring only)
-    * `local` - Local CMDOP agent
-    * `cloud` - Cloud CMDOP (API key)
-    * `grpc` - gRPC SDK (Unrealon)
+    * `grpc` - gRPC SDK (recommended)
+    * `local` - Local CMDOP agent (deprecated)
+    * `cloud` - Cloud CMDOP (deprecated)
     """
 
     NONE = "none"
+    GRPC = "grpc"
     LOCAL = "local"
     CLOUD = "cloud"
-    GRPC = "grpc"
 
 
 
@@ -207,11 +209,33 @@ class ScheduleRunStatus(StrEnum):
 
 
 
+class SendCommandRequestCommand(StrEnum):
+    """
+    Command to send: run (start task), pause, resume, stop (graceful shutdown), start (alias for run), restart (stop + run)
+    * `run` - run
+    * `pause` - pause
+    * `resume` - resume
+    * `stop` - stop
+    * `start` - start
+    * `restart` - restart
+    """
+
+    RUN = "run"
+    PAUSE = "pause"
+    RESUME = "resume"
+    STOP = "stop"
+    START = "start"
+    RESTART = "restart"
+
+
+
 class ServiceStatus(StrEnum):
     """
     Current service status
     * `initializing` - Initializing
     * `running` - Running
+    * `idle` - Idle (Waiting)
+    * `busy` - Busy (Processing)
     * `paused` - Paused
     * `stopping` - Stopping
     * `stopped` - Stopped
@@ -222,6 +246,8 @@ class ServiceStatus(StrEnum):
 
     INITIALIZING = "initializing"
     RUNNING = "running"
+    IDLE = "idle"
+    BUSY = "busy"
     PAUSED = "paused"
     STOPPING = "stopping"
     STOPPED = "stopped"

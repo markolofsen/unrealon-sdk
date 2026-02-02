@@ -49,17 +49,20 @@ class CommandRegistry:
         self._default_handler = handler
         logger.debug("Registered default command handler")
 
-    def get_handler(self, command_type: str) -> CommandHandler | None:
+    def get_handler(
+        self, command_type: str, include_default: bool = False
+    ) -> CommandHandler | None:
         """Get handler for command type.
 
         Args:
             command_type: Command type to look up
+            include_default: If True, return default handler when no specific found
 
         Returns:
             Handler function or None if not found
         """
         handler = self._handlers.get(command_type)
-        if not handler and self._default_handler:
+        if not handler and include_default and self._default_handler:
             return self._default_handler
         return handler
 
@@ -75,7 +78,7 @@ class CommandRegistry:
         Returns:
             Tuple of (status, result_json, error_message)
         """
-        handler = self.get_handler(command.type)
+        handler = self.get_handler(command.type, include_default=True)
         logger.info("Executing command: type=%s, id=%s", command.type, command.id)
 
         if not handler:

@@ -30,19 +30,27 @@ class ScheduleManager:
     Server triggers schedules via Command (type="schedule:*").
     SDK executes registered handlers and sends ScheduleAck.
 
+    Fallback behavior: If no schedule-specific handler is registered for an
+    action_type (e.g., "run"), the manager will look for a command handler
+    with the same name. This allows `on_command("run", handler)` to handle
+    both manual runs and scheduled runs with action_type="run".
+
     Example:
         ```python
         client = ServiceClient(...)
 
+        # This handler will be used for both:
+        # - Manual "run" commands from dashboard
+        # - Scheduled runs with action_type="run"
+        @client.on_command("run")
+        def handle_run(params: dict) -> dict:
+            process_items()
+            return {"status": "ok"}
+
+        # Or register schedule-specific handler (takes priority)
         @client.on_schedule("process")
         def handle_process(schedule: Schedule, params: dict) -> dict:
-            # Process items
             return {"items": 100}
-
-        @client.on_any_schedule
-        def handle_any(schedule: Schedule, params: dict) -> dict:
-            logger.info(f"Schedule {schedule.name} triggered")
-            return {}
         ```
     """
 
@@ -52,6 +60,7 @@ class ScheduleManager:
         "_handlers",
         "_default_handler",
         "_ack_callback",
+        "_command_handler_getter",
     )
 
     def __init__(self) -> None:
@@ -61,6 +70,7 @@ class ScheduleManager:
         self._handlers: dict[str, ScheduleHandler | AsyncScheduleHandler] = {}
         self._default_handler: ScheduleHandler | AsyncScheduleHandler | None = None
         self._ack_callback: Callable[[ScheduleResult], None] | None = None
+        self._command_handler_getter: Callable[[str], Any] | None = None
 
     @property
     def schedules(self) -> dict[str, Schedule]:
@@ -75,6 +85,20 @@ class ScheduleManager:
     def set_ack_callback(self, callback: Callable[[ScheduleResult], None]) -> None:
         """Set callback for sending schedule acknowledgments."""
         self._ack_callback = callback
+
+    def set_command_handler_getter(
+        self, getter: Callable[[str], Any] | None
+    ) -> None:
+        """
+        Set function to get command handlers for fallback.
+
+        This allows schedule manager to fall back to command handlers
+        when no schedule-specific handler is registered.
+
+        Args:
+            getter: Function(command_type: str) -> handler or None
+        """
+        self._command_handler_getter = getter
 
     def update_schedules(self, schedule_config) -> None:
         """
@@ -172,8 +196,24 @@ class ScheduleManager:
                 action_params=params,
             )
 
-        # Find handler
-        handler = self._handlers.get(action_type, self._default_handler)
+        # Find handler with fallback to command handlers
+        handler = self._handlers.get(action_type)
+        use_command_handler = False
+
+        if not handler:
+            # Try fallback to command handler
+            if self._command_handler_getter:
+                command_handler = self._command_handler_getter(action_type)
+                if command_handler:
+                    handler = command_handler
+                    use_command_handler = True
+                    logger.debug(
+                        "Using command handler as fallback for schedule action: %s",
+                        action_type,
+                    )
+
+        if not handler:
+            handler = self._default_handler
 
         if not handler:
             logger.warning("No handler for schedule action type: %s", action_type)
@@ -186,10 +226,18 @@ class ScheduleManager:
 
         # Execute handler
         try:
-            if asyncio.iscoroutinefunction(handler):
-                result_data = await handler(schedule, params)
+            if use_command_handler:
+                # Command handlers take only params
+                if asyncio.iscoroutinefunction(handler):
+                    result_data = await handler(params)
+                else:
+                    result_data = handler(params)
             else:
-                result_data = handler(schedule, params)
+                # Schedule handlers take (schedule, params)
+                if asyncio.iscoroutinefunction(handler):
+                    result_data = await handler(schedule, params)
+                else:
+                    result_data = handler(schedule, params)
 
             duration_ms = int((time.perf_counter() - start_time) * 1000)
 

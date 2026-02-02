@@ -415,7 +415,19 @@ class ServiceClient:
         command_type: str,
         handler: Callable[[dict[str, Any]], dict[str, Any] | None],
     ) -> None:
-        """Register command handler for specific command type."""
+        """Register command handler for specific command type.
+
+        This handler will be called for:
+        - Manual commands from dashboard (Run, Pause, Resume, Stop)
+        - Scheduled triggers with matching action_type (fallback)
+
+        For example, `on_command("run", handler)` handles both manual Run
+        button clicks AND scheduled runs with action_type="run".
+
+        Args:
+            command_type: Command type (e.g., "run", "pause", "resume", "stop")
+            handler: Function(params: dict) -> dict | None
+        """
         self.grpc.on_command(command_type, handler)
 
     def on_any_command(
@@ -431,19 +443,25 @@ class ServiceClient:
     ) -> None:
         """Register handler for specific schedule action type.
 
-        Server pushes schedule triggers via gRPC. SDK executes registered
-        handlers and sends acknowledgment back.
+        Use this only if you need schedule-specific behavior different from
+        the command handler. This handler takes priority over command fallback.
+
+        Note: If no schedule handler is registered for an action_type, the SDK
+        automatically falls back to the command handler with the same name.
+        For most cases, just use `on_command("run", handler)` for both manual
+        and scheduled runs.
 
         Args:
-            action_type: Schedule action type (e.g., "process", "pause", "custom")
+            action_type: Schedule action type (e.g., "process", "custom")
             handler: Function(schedule: Schedule, params: dict) -> dict | None
 
         Example:
             ```python
+            # Only needed if you want different behavior for scheduled vs manual
             @client.on_schedule("process")
-            def handle_process(schedule, params):
-                # Process items
-                items = do_work()
+            def handle_scheduled_process(schedule, params):
+                # Has access to schedule.name, schedule.id, etc.
+                items = do_work(schedule.action_params)
                 return {"items_processed": len(items)}
             ```
         """
@@ -792,7 +810,7 @@ class AsyncServiceClient:
         command_type: str,
         handler: Callable[[dict[str, Any]], dict[str, Any] | None],
     ) -> None:
-        """Register command handler."""
+        """Register command handler (also handles scheduled triggers with same action_type)."""
         self.grpc.on_command(command_type, handler)
 
     def on_any_command(self, handler: Callable[[dict[str, Any]], dict[str, Any] | None]) -> None:
@@ -804,7 +822,7 @@ class AsyncServiceClient:
         action_type: str,
         handler: Callable[..., dict[str, Any] | None],
     ) -> None:
-        """Register handler for specific schedule action type."""
+        """Register schedule-specific handler (takes priority over command fallback)."""
         self.grpc.on_schedule(action_type, handler)
 
     def on_any_schedule(

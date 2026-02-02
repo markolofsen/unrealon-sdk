@@ -182,6 +182,10 @@ class GRPCStreamService:
         self._command_registry = CommandRegistry()
         self._schedule_manager = ScheduleManager()
         self._schedule_manager.set_ack_callback(self._send_schedule_ack)
+        # Enable fallback to command handlers for schedules
+        self._schedule_manager.set_command_handler_getter(
+            self._command_registry.get_handler
+        )
 
     # ═══════════════════════════════════════════════════════════
     # PROPERTIES
@@ -412,7 +416,6 @@ class GRPCStreamService:
     async def _handle_server_message(self, message: unrealon_pb2.ServerMessage) -> None:
         """Handle incoming server messages."""
         payload_type = message.WhichOneof("payload")
-        logger.info("Received server message: type=%s, seq=%s", payload_type, message.sequence)
 
         if payload_type == "command":
             logger.info("Command received: type=%s, id=%s", message.command.type, message.command.id)
@@ -420,7 +423,7 @@ class GRPCStreamService:
             asyncio.create_task(self._execute_command(message.command))
         elif payload_type == "heartbeat_ack":
             self._reconnection.reset_heartbeat_failures()
-            logger.debug("Heartbeat ack: %s", message.heartbeat_ack.server_time)
+            logger.debug("Heartbeat ack: seq=%s", message.sequence)
         elif payload_type == "config_update":
             self._apply_config(message.config_update)
         elif payload_type == "server_status":

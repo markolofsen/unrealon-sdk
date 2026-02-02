@@ -1,23 +1,24 @@
 # Unrealon SDK
 
-Python SDK для мониторинга и управления сервисами через Unrealon платформу.
+Python SDK for monitoring and managing services via the Unrealon platform.
 
-## Что даёт SDK
+## Features
 
-- **Мониторинг** — видишь статус сервиса в реальном времени
-- **Логи в облако** — все логи доступны в веб-интерфейсе
-- **Управление** — pause/resume/stop прямо из дашборда
-- **Метрики** — счётчики обработанных элементов и ошибок
+- **Monitoring** — real-time service status visibility
+- **Cloud Logs** — all logs accessible in the web interface
+- **Control** — pause/resume/stop directly from the dashboard
+- **Metrics** — counters for processed items and errors
+- **Scheduling** — automatic cron-based task execution
 
-## Установка
+## Installation
 
 ```bash
 pip install unrealon
 ```
 
-## Быстрый старт
+## Quick Start
 
-### Минимальный пример
+### Minimal Example
 
 ```python
 from unrealon import ServiceClient
@@ -32,9 +33,9 @@ with ServiceClient(api_key="pk_xxx", service_name="my-service") as client:
     client.info("Done")
 ```
 
-Всё. Сервис зарегистрируется, логи пойдут в облако, метрики будут отображаться.
+The service will register, logs will stream to cloud, and metrics will be displayed.
 
-### С поддержкой pause/resume
+### With Pause/Resume Support
 
 ```python
 from unrealon import ServiceClient
@@ -43,7 +44,7 @@ with ServiceClient(api_key="pk_xxx", service_name="my-parser") as client:
     client.info("Started")
 
     for item in items:
-        client.check_interrupt()  # Тут парсер встанет на паузу если нажать Pause
+        client.check_interrupt()  # Parser pauses here if Pause is clicked
 
         process(item)
         client.increment_processed()
@@ -51,13 +52,13 @@ with ServiceClient(api_key="pk_xxx", service_name="my-parser") as client:
     client.info("Done")
 ```
 
-`check_interrupt()` делает две вещи:
-- Если нажали **Pause** — ждёт пока нажмут Resume
-- Если нажали **Stop** — выбрасывает `StopInterrupt`
+`check_interrupt()` does two things:
+- If **Pause** was clicked — waits until Resume
+- If **Stop** was clicked — raises `StopInterrupt`
 
 ## Continuous Mode
 
-Сервис который ждёт команд из дашборда:
+A service that waits for commands from the dashboard:
 
 ```python
 import time
@@ -83,21 +84,21 @@ with ServiceClient(api_key="pk_xxx", service_name="my-parser") as client:
 
     client.on_command("run", handle_run)
 
-    # Ждём команд
+    # Wait for commands
     client.set_idle()
     while not client.should_stop:
         time.sleep(1)
 ```
 
-Теперь можно из дашборда:
-- Нажать **Run** — запустится `handle_run`
-- Нажать **Pause** — парсер встанет на `check_interrupt()`
-- Нажать **Resume** — продолжит с того же места
-- Нажать **Stop** — завершится gracefully
+Now from the dashboard you can:
+- Click **Run** — executes `handle_run`
+- Click **Pause** — parser stops at `check_interrupt()`
+- Click **Resume** — continues from where it left off
+- Click **Stop** — graceful shutdown
 
 ## API
 
-### Логирование
+### Logging
 
 ```python
 client.debug("Debug message")
@@ -106,48 +107,68 @@ client.warning("Warning")
 client.error("Error", code=500)
 ```
 
-Логи идут в три места: консоль (Rich), файл, облако.
+Logs go to three places: console (Rich), file, and cloud.
 
-### Метрики
+### Metrics
 
 ```python
-client.increment_processed()      # +1 обработано
-client.increment_processed(10)    # +10 обработано
-client.increment_errors()         # +1 ошибка
+client.increment_processed()      # +1 processed
+client.increment_processed(10)    # +10 processed
+client.increment_errors()         # +1 error
 ```
 
-### Статусы
+### Status
 
 ```python
-client.set_busy()    # Показывает "Busy" в дашборде
-client.set_idle()    # Показывает "Idle"
+client.set_busy()    # Shows "Busy" in dashboard
+client.set_idle()    # Shows "Idle"
 ```
 
-### Состояние
+### State
 
 ```python
-client.is_paused     # True если на паузе
-client.should_stop   # True если запрошена остановка
-client.is_connected  # True если подключен к серверу
+client.is_paused     # True if paused
+client.should_stop   # True if stop requested
+client.is_connected  # True if connected to server
 ```
 
-### Команды
+### Commands
 
 ```python
-# Регистрация обработчика
+# Register handler
 client.on_command("run", handle_run)
 client.on_command("custom", handle_custom)
 
-# Обработчик получает params и возвращает результат
+# Handler receives params and returns result
 def handle_run(params: dict) -> dict:
     limit = params.get("limit", 10)
     # ... do work ...
     return {"status": "ok", "processed": 100}
 ```
 
-## Конфигурация
+### Schedules
 
-### Через переменные окружения
+Schedules run automatically based on cron expressions.
+If the schedule's `action_type` matches a registered command,
+the same handler is used:
+
+```python
+# This handler works for both manual Run and scheduled runs
+client.on_command("run", handle_run)
+```
+
+For different behavior, register a schedule-specific handler:
+
+```python
+@client.on_schedule("process")
+def handle_scheduled_process(schedule, params):
+    # schedule.name, schedule.id are available
+    return {"items_processed": 100}
+```
+
+## Configuration
+
+### Via Environment Variables
 
 ```bash
 export UNREALON_API_KEY=pk_xxx
@@ -155,18 +176,18 @@ export UNREALON_SERVICE_NAME=my-service
 ```
 
 ```python
-# Подхватит из env
+# Picks up from env
 with ServiceClient() as client:
     ...
 ```
 
-### Dev mode (локальный сервер)
+### Dev Mode (Local Server)
 
 ```python
 with ServiceClient(
     api_key="dk_xxx",
     service_name="my-service",
-    dev_mode=True,  # Подключится к localhost:50051
+    dev_mode=True,  # Connects to localhost:50051
 ) as client:
     ...
 ```
@@ -175,7 +196,7 @@ with ServiceClient(
 
 ```python
 from unrealon.exceptions import (
-    StopInterrupt,        # Stop requested (наследует BaseException!)
+    StopInterrupt,        # Stop requested (inherits BaseException!)
     UnrealonError,        # Base SDK error
     AuthenticationError,  # Bad API key
     RegistrationError,    # Can't register
@@ -190,13 +211,13 @@ except StopInterrupt:
     print("Stopped by command")
 ```
 
-**Важно**: `StopInterrupt` наследует `BaseException`, не `Exception`.
-Это значит что `except Exception` его НЕ поймает — специально, чтобы
-generic error handlers не глотали команду stop.
+**Important**: `StopInterrupt` inherits from `BaseException`, not `Exception`.
+This means `except Exception` won't catch it — by design, so generic
+error handlers don't swallow the stop command.
 
 ## Standalone Logger
 
-Можно использовать логгер отдельно от SDK:
+You can use the logger separately from the SDK:
 
 ```python
 from unrealon.logging import get_logger
@@ -206,4 +227,4 @@ log.info("Starting", version="1.0")
 log.error("Failed", error="connection timeout")
 ```
 
-Логи пойдут в консоль и файл (без облака).
+Logs go to console and file (without cloud).

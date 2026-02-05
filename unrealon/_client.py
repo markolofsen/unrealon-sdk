@@ -79,6 +79,7 @@ class ServiceClient:
         "_logger",
         "_cloud_handler",
         "_resume_event",
+        "_log_level",
     )
 
     def __init__(
@@ -94,6 +95,7 @@ class ServiceClient:
         heartbeat_interval: int | None = None,
         log_batch_size: int | None = None,
         log_flush_interval: float | None = None,
+        log_level: str = "INFO",
     ) -> None:
         """
         Initialize service client.
@@ -109,6 +111,7 @@ class ServiceClient:
             heartbeat_interval: Heartbeat interval in seconds
             log_batch_size: Number of logs to batch before sending
             log_flush_interval: Max seconds to wait before flushing logs
+            log_level: Minimum log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         """
         config_kwargs: dict[str, object] = {}
         if api_key:
@@ -151,11 +154,14 @@ class ServiceClient:
         self._resume_event.set()  # Start as "not paused" (event is set)
 
         # Initialize logger with Rich console + file, cloud handler added on start
+        self._log_level = log_level.upper()
         self._logger: UnrealonLogger = get_logger(
             name=self._config.service_name,
+            level=self._log_level,  # type: ignore[arg-type]
             log_to_cloud=False,  # Will be connected after gRPC start
         )
         self._cloud_handler: CloudHandler = CloudHandler()
+        self._cloud_handler.setLevel(getattr(logging, self._log_level))
 
     @property
     def grpc(self) -> GRPCStreamService:
@@ -603,10 +609,17 @@ class ServiceClient:
 
     def _setup_signal_handlers(self) -> None:
         """Setup graceful shutdown signal handlers."""
+        import os
 
         def signal_handler(signum: int, _frame: FrameType | None) -> None:
+            if self._shutdown_requested:
+                # Second signal - force exit immediately
+                logger.info("Received signal %d again, forcing exit...", signum)
+                os._exit(1)
             logger.info("Received signal %d, requesting shutdown...", signum)
             self._shutdown_requested = True
+            # Unblock any waiting threads
+            self._resume_event.set()
 
         try:
             self._original_sigint = signal.signal(signal.SIGINT, signal_handler)
@@ -631,6 +644,7 @@ class AsyncServiceClient:
         "_grpc",
         "_logger",
         "_cloud_handler",
+        "_log_level",
     )
 
     def __init__(
@@ -643,6 +657,7 @@ class AsyncServiceClient:
         dev_mode: bool = False,
         source_code: str | None = None,
         description: str | None = None,
+        log_level: str = "INFO",
     ) -> None:
         """Initialize async service client."""
         config_kwargs: dict[str, object] = {}
@@ -674,11 +689,14 @@ class AsyncServiceClient:
         self._grpc: GRPCStreamService | None = None
 
         # Initialize logger with Rich console + file, cloud handler added on start
+        self._log_level = log_level.upper()
         self._logger: UnrealonLogger = get_logger(
             name=self._config.service_name,
+            level=self._log_level,  # type: ignore[arg-type]
             log_to_cloud=False,
         )
         self._cloud_handler: CloudHandler = CloudHandler()
+        self._cloud_handler.setLevel(getattr(logging, self._log_level))
 
     @property
     def grpc(self) -> GRPCStreamService:

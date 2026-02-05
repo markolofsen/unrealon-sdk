@@ -53,6 +53,7 @@ from .exceptions import (
 from .grpc import GRPCStreamService
 from .logging import get_logger
 from .models import ServiceStatus
+from .runner import TaskRunner
 from .scheduling import Schedule, ScheduleResult, ScheduleRunStatus
 
 __all__ = [
@@ -96,4 +97,8 @@ __all__ = [
     "Schedule",
     "ScheduleResult",
     "ScheduleRunStatus",
+    # Runner
+    "TaskRunner",
+    # Parsers submodule (import as: from unrealon.parsers import ...)
+    # Note: parsers module requires optional dependencies: pip install unrealon[parsers]
 ]

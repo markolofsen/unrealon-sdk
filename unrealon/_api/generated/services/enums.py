@@ -99,6 +99,22 @@ class LogEntryRequestLevel(StrEnum):
 
 
 
+class PatchedScheduleCreateRequestActionType(StrEnum):
+    """
+    Action type to execute
+    * `run` - Run (execute parser)
+    * `pause` - Pause service
+    * `resume` - Resume service
+    * `custom` - Custom action
+    """
+
+    RUN = "run"
+    PAUSE = "pause"
+    RESUME = "resume"
+    CUSTOM = "custom"
+
+
+
 class PatchedServiceDetailRequestConnectionType(StrEnum):
     """
     How to control this service (local, cloud, ssh, or none)

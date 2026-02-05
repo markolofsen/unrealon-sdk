@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..enums import ScheduleEventEventType, ScheduleRunStatus
+from ..enums import PatchedScheduleCreateRequestActionType, ScheduleEventEventType, ScheduleRunStatus
 
 
 class Schedule(BaseModel):
@@ -34,10 +34,9 @@ class Schedule(BaseModel):
     max_length=100,
 )
     frequency_display: Any = ...
-    action_type: str | None = Field(
+    action_type: PatchedScheduleCreateRequestActionType | None = Field(
     None,
-    description='Action type to execute (process,...',
-    max_length=50,
+    description='Action type to execute  * `run` ...',
 )
     next_run_at: str | None = Field(None, description='Next scheduled execution time')
     last_run_at: Any | None = Field(None, description='Last execution time')
@@ -105,11 +104,9 @@ class ScheduleCreateRequest(BaseModel):
     min_length=1,
     max_length=50,
 )
-    action_type: str | None = Field(
+    action_type: PatchedScheduleCreateRequestActionType | None = Field(
     None,
-    description='Action type to execute (process,...',
-    min_length=1,
-    max_length=50,
+    description='Action type to execute  * `run` ...',
 )
     action_params: dict[str, Any] | None = Field(
     None,
@@ -163,10 +160,9 @@ class ScheduleCreate(BaseModel):
     description="Timezone for schedule (e.g., 'Eu...",
     max_length=50,
 )
-    action_type: str | None = Field(
+    action_type: PatchedScheduleCreateRequestActionType | None = Field(
     None,
-    description='Action type to execute (process,...',
-    max_length=50,
+    description='Action type to execute  * `run` ...',
 )
     action_params: dict[str, Any] | None = Field(
     None,
@@ -223,10 +219,9 @@ class ScheduleDetail(BaseModel):
     description="Timezone for schedule (e.g., 'Eu...",
     max_length=50,
 )
-    action_type: str | None = Field(
+    action_type: PatchedScheduleCreateRequestActionType | None = Field(
     None,
-    description='Action type to execute (process,...',
-    max_length=50,
+    description='Action type to execute  * `run` ...',
 )
     action_params: dict[str, Any] | None = Field(
     None,
@@ -294,11 +289,9 @@ class PatchedScheduleCreateRequest(BaseModel):
     min_length=1,
     max_length=50,
 )
-    action_type: str | None = Field(
+    action_type: PatchedScheduleCreateRequestActionType | None = Field(
     None,
-    description='Action type to execute (process,...',
-    min_length=1,
-    max_length=50,
+    description='Action type to execute  * `run` ...',
 )
     action_params: dict[str, Any] | None = Field(
     None,
